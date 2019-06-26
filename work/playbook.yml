@@ -1,0 +1,41 @@
+- hosts: master
+  tasks:
+      - name: Check if we have internal ens
+        command: ip link show ens4
+        register: ip_link_result
+        ignore_errors: True
+      - name: Start the internal interface
+        command: ip link set ens4 up
+        become: yes
+        when: ip_link_result.stdout.find('state UP') == -1
+      - name: Check if we have internal ip on ens
+        command: ip addr show dev ens4
+        register: ip_addr_result
+        ignore_errors: True
+      - name: Add ip to other interface
+        command: ip addr add {{ internal_ip }}/24 dev ens4
+        become: yes
+        when: ip_addr_result.stdout.find('inet 10.0.0') == -1
+      - name: Enable MASQUERADING of internal network
+        iptables:
+            table: nat
+            chain: POSTROUTING
+            jump: MASQUERADE
+            out_interface: eth0
+        become: yes
+      - name: Enable ip_forward
+        sysctl:
+            name: net.ipv4.ip_forward
+            value: "1"
+            sysctl_set: yes
+            state: present
+            reload: yes
+        become: yes
+- hosts: workers
+  tasks:
+      - name: Test connection
+        command: echo HELLO
+- hosts: computes
+  tasks:
+      - name: Test connection
+        command: echo HELLO
