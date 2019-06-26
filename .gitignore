@@ -1,3 +1,13 @@
+## Mine
+password
+.terraform/
+venv/
+bin/
+terraform.tfstate*
+inventory
+*.bak
+
+## Original
 admin-csr.json             
 admin-key.pem              
 admin.csr                  
