@@ -1,0 +1,16 @@
+- hosts: master
+  become: yes
+  tasks:
+    - name: Install cfssl and cfssljson
+      get_url:
+          url: "https://pkg.cfssl.org/R1.2/{{ item }}_linux-amd64"
+          dest: "/usr/local/bin/{{ item }}"
+          mode: 0777
+      with_items:
+          - cfssl
+          - cfssljson
+    - name: Install kubectl
+      get_url:
+          url: https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kubectl
+          dest: /usr/local/bin/kubectl
+          mode: 0777
