@@ -1,4 +1,5 @@
 - hosts: master
+  become: yes
   tasks:
       - name: Check if we have internal ens
         command: ip link show ens4
@@ -6,7 +7,6 @@
         ignore_errors: True
       - name: Start the internal interface
         command: ip link set ens4 up
-        become: yes
         when: ip_link_result.stdout.find('state UP') == -1
       - name: Check if we have internal ip on ens
         command: ip addr show dev ens4
@@ -14,15 +14,13 @@
         ignore_errors: True
       - name: Add ip to other interface
         command: ip addr add {{ internal_ip }}/24 dev ens4
-        become: yes
         when: ip_addr_result.stdout.find('inet 10.0.0') == -1
       - name: Enable MASQUERADING of internal network
         iptables:
             table: nat
             chain: POSTROUTING
             jump: MASQUERADE
-            out_interface: eth0
-        become: yes
+            out_interface: ens3
       - name: Enable ip_forward
         sysctl:
             name: net.ipv4.ip_forward
@@ -30,12 +28,22 @@
             sysctl_set: yes
             state: present
             reload: yes
-        become: yes
-- hosts: workers
+- hosts: workers, computes
+  become: yes
   tasks:
-      - name: Test connection
-        command: echo HELLO
-- hosts: computes
-  tasks:
-      - name: Test connection
-        command: echo HELLO
+      - name: Check if default route is correct
+        shell: ip route | grep 'default via {{ router }}'
+        register: ip_route_result
+        ignore_errors: True
+        failed_when: ip_route_result.rc == 2
+      - name: Delete incorrect default route
+        command: ip route del default
+        when: ip_route_result.rc != 0
+      - name: Add correct default route
+        command: ip route add default via {{ router }}
+        when: ip_route_result.rc != 0
+      - name: Fix resolv.conf
+        lineinfile:
+            path: /etc/resolv.conf
+            regexp: '^nameserver'
+            line: 'nameserver 8.8.8.8'
