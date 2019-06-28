@@ -54,8 +54,8 @@ resource "openstack_networking_port_v2" "network-port" {
 
 ### COMPUTES ###
 
-resource "openstack_compute_instance_v2" "k8shard-login-node" {
-  name = "login-node"
+resource "openstack_compute_instance_v2" "k8shard-master" {
+  name = "master"
   image_id = var.image-id
   flavor_name = "ssc.medium"
   key_pair = "viklund mac pro"
@@ -70,9 +70,9 @@ resource "openstack_compute_instance_v2" "k8shard-login-node" {
   }
 }
 
-module "computes" {
+module "controllers" {
   source = "./tf/compute"
-  base_name = "compute"
+  base_name = "controller"
   compute_count = 3
   network = module.k8shard-net.network-id
   image_id = var.image-id
@@ -89,7 +89,7 @@ module "workers" {
 
 resource "openstack_compute_floatingip_associate_v2" "fip_1" {
   floating_ip = var.floating-ip
-  instance_id = openstack_compute_instance_v2.k8shard-login-node.id
+  instance_id = openstack_compute_instance_v2.k8shard-master.id
 }
 
 data "template_file" "ansible_inventory" {
@@ -97,9 +97,19 @@ data "template_file" "ansible_inventory" {
 
   vars = {
     ip          = var.floating-ip
-    internal_ip = openstack_compute_instance_v2.k8shard-login-node.network[1].fixed_ip_v4
-    workers     = join("\n", formatlist("%-9s ansible_user=ubuntu ansible_ssh_common_args='-o ProxyJump=ubuntu@${var.floating-ip}' router=%s", split("\n",module.workers.ips),  openstack_compute_instance_v2.k8shard-login-node.network[1].fixed_ip_v4))
-    computes    = join("\n", formatlist("%-9s ansible_user=ubuntu ansible_ssh_common_args='-o ProxyJump=ubuntu@${var.floating-ip}' router=%s", split("\n",module.computes.ips), openstack_compute_instance_v2.k8shard-login-node.network[1].fixed_ip_v4))
+    internal_ip = openstack_compute_instance_v2.k8shard-master.network[1].fixed_ip_v4
+    workers     = join("\n", formatlist("%-9s ansible_user=ubuntu ansible_ssh_common_args='-o ProxyJump=ubuntu@${var.floating-ip}' router=%s", split("\n",module.workers.ips),  openstack_compute_instance_v2.k8shard-master.network[1].fixed_ip_v4))
+    controllers = join("\n", formatlist("%-9s ansible_user=ubuntu ansible_ssh_common_args='-o ProxyJump=ubuntu@${var.floating-ip}' router=%s", split("\n",module.controllers.ips), openstack_compute_instance_v2.k8shard-master.network[1].fixed_ip_v4))
+  }
+}
+
+data "template_file" "hosts_file" {
+  template = "$${content}"
+
+  vars = {
+    content = format("%s %s\n%s\n%s", 
+      openstack_compute_instance_v2.k8shard-master.network[1].fixed_ip_v4, openstack_compute_instance_v2.k8shard-master.name,
+      module.controllers.name-ips, module.workers.name-ips)
   }
 }
 
@@ -108,5 +118,13 @@ resource "null_resource" "ansible_inventory_writer" {
 
   provisioner "local-exec" {
     command = "echo \"${data.template_file.ansible_inventory.rendered}\" > \"${path.root}/inventory\""
+  }
+}
+
+resource "null_resource" "hosts_file_writer" {
+  triggers = { uuid = uuid() }
+
+  provisioner "local-exec" {
+    command = "echo \"${data.template_file.hosts_file.rendered}\" > \"${path.root}/hosts\""
   }
 }

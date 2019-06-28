@@ -1,0 +1,261 @@
+- hosts: master
+  tasks:
+      - name: Create Certificate Authority files
+        shell: |
+            cat > ca-config.json <<EOF
+            {
+              "signing": {
+                "default": {
+                  "expiry": "8760h"
+                },
+                "profiles": {
+                  "kubernetes": {
+                    "usages": ["signing", "key encipherment", "server auth", "client auth"],
+                    "expiry": "8760h"
+                  }
+                }
+              }
+            }
+            EOF
+            cat > ca-csr.json <<EOF
+            {
+              "CN": "Kubernetes",
+              "key": {
+                "algo": "rsa",
+                "size": 2048
+              },
+              "names": [
+                {
+                  "C": "SE",
+                  "L": "Uppsala",
+                  "O": "Kubernetes",
+                  "OU": "Wizard Training",
+                  "ST": "Uppsala"
+                }
+              ]
+            }
+            EOF
+      - name: Generate certificate authority
+        shell: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+      - name: Create Admin Client Certificate
+        shell: |
+            {
+        
+            cat > admin-csr.json <<EOF
+            {
+              "CN": "admin",
+              "key": {
+                "algo": "rsa",
+                "size": 2048
+              },
+              "names": [
+                {
+                  "C": "SE",
+                  "L": "Uppsala",
+                  "O": "system:masters",
+                  "OU": "Kubernetes The Hard Way",
+                  "ST": "Uppsala"
+                }
+              ]
+            }
+            EOF
+        
+            cfssl gencert \
+              -ca=ca.pem \
+              -ca-key=ca-key.pem \
+              -config=ca-config.json \
+              -profile=kubernetes \
+              admin-csr.json | cfssljson -bare admin
+        
+            }
+      - name: Create Kubelet Client Certificates
+        args:
+          executable: /bin/bash
+        shell: |
+            {
+                for instance in worker-{00,01,02}; do
+                    cat > ${instance}-csr.json <<EOF
+                    {
+                      "CN": "system:node:${instance}",
+                      "key": {
+                        "algo": "rsa",
+                        "size": 2048
+                      },
+                      "names": [
+                        {
+                          "C": "SE",
+                          "L": "Uppsala",
+                          "O": "system:nodes",
+                          "OU": "Kubernetes The Hard Way",
+                          "ST": "Uppsala"
+                        }
+                      ]
+                    }
+            EOF
+                    INTERNAL_IP=$( grep $instance /etc/hosts | awk '{print $1}' )
+                    cfssl gencert \
+                        -ca=ca.pem \
+                        -ca-key=ca-key.pem \
+                        -config=ca-config.json \
+                        -hostname=${instance},${INTERNAL_IP} \
+                        -profile=kubernetes \
+                        ${instance}-csr.json | cfssljson -bare ${instance}
+                done
+            }
+      - name: Create Controller Manager Client Certificate
+        shell: |
+            {
+        
+            cat > kube-controller-manager-csr.json <<EOF
+            {
+                  "CN": "system:kube-controller-manager",
+                  "key": {
+                    "algo": "rsa",
+                    "size": 2048
+                  },
+                  "names": [
+                    {
+                      "C": "SE",
+                      "L": "Uppsala",
+                      "O": "system:kube-controller-manager",
+                      "OU": "Kubernetes The Hard Way",
+                      "ST": "Uppsala"
+                    }
+                  ]
+            }
+            EOF
+        
+            cfssl gencert \
+              -ca=ca.pem \
+              -ca-key=ca-key.pem \
+              -config=ca-config.json \
+              -profile=kubernetes \
+              kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
+        
+            }
+      - name: Create Kube Proxy Client Certificate
+        shell: |
+            {
+        
+            cat > kube-proxy-csr.json <<EOF
+            {
+                  "CN": "system:kube-proxy",
+                  "key": {
+                    "algo": "rsa",
+                    "size": 2048
+                  },
+                  "names": [
+                    {
+                      "C": "SE",
+                      "L": "Uppsala",
+                      "O": "system:node-proxier",
+                      "OU": "Kubernetes The Hard Way",
+                      "ST": "Uppsala"
+                    }
+                  ]
+            }
+            EOF
+        
+            cfssl gencert \
+              -ca=ca.pem \
+              -ca-key=ca-key.pem \
+              -config=ca-config.json \
+              -profile=kubernetes \
+              kube-proxy-csr.json | cfssljson -bare kube-proxy
+            }
+      - name: Create Scheduler Client Certificate
+        shell: |
+            {
+        
+            cat > kube-scheduler-csr.json <<EOF
+            {
+                  "CN": "system:kube-scheduler",
+                  "key": {
+                    "algo": "rsa",
+                    "size": 2048
+                  },
+                  "names": [
+                    {
+                      "C": "SE",
+                      "L": "Uppsala",
+                      "O": "system:kube-scheduler",
+                      "OU": "Kubernetes The Hard Way",
+                      "ST": "Uppsala"
+                    }
+                  ]
+            }
+            EOF
+        
+            cfssl gencert \
+              -ca=ca.pem \
+              -ca-key=ca-key.pem \
+              -config=ca-config.json \
+              -profile=kubernetes \
+              kube-scheduler-csr.json | cfssljson -bare kube-scheduler
+            }
+      - name: Create API Server Certificate
+        shell: |
+            {
+        
+            cat > kubernetes-csr.json <<EOF
+            {
+                  "CN": "kubernetes",
+                  "key": {
+                    "algo": "rsa",
+                    "size": 2048
+                  },
+                  "names": [
+                    {
+                      "C": "SE",
+                      "L": "Uppsala",
+                      "O": "Kubernetes",
+                      "OU": "Kubernetes The Hard Way",
+                      "ST": "Uppsala"
+                    }
+                  ]
+            }
+            EOF
+
+            EXTERNAL_IP=130.239.81.217 ### TODO FIX THIS
+            INTERNAL_IP=$( ip addr | grep 10.0.0 | awk '{print $2}' | cut -d/ -f1 )
+            IPS=$( grep controller /etc/hosts | awk '{print $1}' | tr "\n" ',' | sed 's/,$//' )
+        
+            cfssl gencert \
+              -ca=ca.pem \
+              -ca-key=ca-key.pem \
+              -config=ca-config.json \
+              -hostname=${IPS},${EXTERNAL_IP},${INTERNAL_IP} \
+              -profile=kubernetes \
+              kubernetes-csr.json | cfssljson -bare kubernetes
+            }
+      - name: Create Service Account Certificate
+        shell: |
+            {
+        
+            cat > service-account-csr.json <<EOF
+            {
+                  "CN": "service-accounts",
+                  "key": {
+                    "algo": "rsa",
+                    "size": 2048
+                  },
+                  "names": [
+                    {
+                      "C": "SE",
+                      "L": "Uppsala",
+                      "O": "Kubernetes",
+                      "OU": "Kubernetes The Hard Way",
+                      "ST": "Uppsala"
+                    }
+                  ]
+            }
+            EOF
+
+            cfssl gencert \
+              -ca=ca.pem \
+              -ca-key=ca-key.pem \
+              -config=ca-config.json \
+              -profile=kubernetes \
+              service-account-csr.json | cfssljson -bare service-account
+            }
+      - name: Create Service Account Certificate

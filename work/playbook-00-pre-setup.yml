@@ -28,7 +28,19 @@
             sysctl_set: yes
             state: present
             reload: yes
-- hosts: workers, computes
+      - name: Check for hosts in /etc/hosts
+        shell: grep worker /etc/hosts
+        register: grep_result
+        failed_when: grep_result.rc == 54
+      - name: Copy local file to node
+        copy:
+            src: hosts
+            dest: /etc/extra-hosts
+        when: grep_result.rc != 0
+      - name: Add extra hosts to end of hosts file
+        shell: cat /etc/extra-hosts >> /etc/hosts
+        when: grep_result.rc != 0
+- hosts: workers, controllers
   become: yes
   tasks:
       - name: Check if default route is correct
@@ -47,3 +59,15 @@
             path: /etc/resolv.conf
             regexp: '^nameserver'
             line: 'nameserver 8.8.8.8'
+      - name: Check for hosts in /etc/hosts
+        shell: grep worker /etc/hosts
+        register: grep_result
+        failed_when: grep_result.rc == 54
+      - name: Copy local file to node
+        copy:
+            src: hosts
+            dest: /etc/extra-hosts
+        when: grep_result.rc != 0
+      - name: Add extra hosts to end of hosts file
+        shell: cat /etc/extra-hosts >> /etc/hosts
+        when: grep_result.rc != 0
