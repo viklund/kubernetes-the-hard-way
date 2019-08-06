@@ -40,6 +40,8 @@
       - name: Add extra hosts to end of hosts file
         shell: cat /etc/extra-hosts >> /etc/hosts
         when: grep_result.rc != 0
+      - name: Add hosts to known_hosts file
+        shell: ssh-keyscan {worker,controller}-{00,01,02} 2>/dev/null | grep ssh-rsa >> .ssh/known_hosts
 - hosts: workers, controllers
   become: yes
   tasks:
