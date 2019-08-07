@@ -1,0 +1,49 @@
+# vim: ts=2:sw=2
+- hosts: master
+  vars:
+      public_ip: 10.0.0.6
+  tasks:
+    - name: Create kubeconfig files
+      args:
+          executable: /bin/bash
+      shell: |
+         kubectl config set-cluster kubernetes-the-hard-way \
+             --certificate-authority=ca.pem \
+             --embed-certs=true \
+             --server=https://{{ public_ip }}:6443 \
+             --kubeconfig={{ instance }}.kubeconfig
+
+         kubectl config set-credentials {{ ns }}:{{ instance }} \
+             --client-certificate={{ instance }}.pem
+             --client-key={{ instance }}-key.pem \
+             --embed-certs=true \
+             --kubeconfig={{ instance }}.kubeconfig
+
+         kubectl config set-context default \
+             --cluster=kubernetes-the-hard-way \
+             --user={{ ns }}:{{ instance }} \
+             --kubeconfig={{ instance }}.kubeconfig
+
+         kubectl config use-context default --kubeconfig={{ instance }}.kubeconfig
+      vars:
+        instance: "{{ item.instance }}"
+        ns: "{{ item.ns }}"
+        public_ip: "{{ item.public_ip }}"
+      loop:
+        - { instance: 'worker-00',               ns: 'system:node', public_ip: '10.0.0.6' }
+        - { instance: 'worker-01',               ns: 'system:node', public_ip: '10.0.0.6' }
+        - { instance: 'worker-02',               ns: 'system:node', public_ip: '10.0.0.6' }
+        - { instance: 'kube-proxy',              ns: 'system',      public_ip: '10.0.0.6' }
+        - { instance: 'kube-controller-manager', ns: 'system',      public_ip: '127.0.0.1' }
+        - { instance: 'kube-scheduler',          ns: 'system',      public_ip: '127.0.0.1' }
+        - { instance: 'admin',                   ns: 'system',      public_ip: '127.0.0.1' }
+    - name: Distribute kubeconfig files
+      args:
+        executable: /bin/bash
+      shell: |
+        for instance in worker-{00,01,02}; do
+          scp ${instance}.kubeconfig kube-proxy.kubeconfig ${instance}:~/
+        done
+        for instance in controller-{00,01,02}; do
+          scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~/
+        done
