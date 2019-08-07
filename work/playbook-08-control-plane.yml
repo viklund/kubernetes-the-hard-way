@@ -1,0 +1,78 @@
+# vim: ts=2:sw=2
+- hosts: controllers
+  become: yes
+  tasks:
+    - name: Create kubernetes directories
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - /etc/kubernetes/config
+        - /var/lib/kubernetes
+    - name: Download Kubernetes Controller Binaries
+      get_url:
+        url: "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetes_version }}/bin/linux/amd64/{{ item }}"
+        dest: /usr/local/bin/
+        mode: 0755
+      with_items:
+        - kube-apiserver
+        - kube-controller-manager
+        - kube-scheduler
+        - kubectl
+    - name: Move files into kubernetes directory
+      args:
+        executable: /bin/bash
+      shell: |
+          mv ca{,-key}.pem \
+             kubernetes{,-key}.pem \
+             service-account{,-key}.pem \
+             encryption-config.yaml \
+             kube-controller-manager.kubeconfig \
+             kube-scheduler.kubeconfig \
+             /var/lib/kubernetes/
+      ignore_errors: yes
+    - name: Create kube-apiserver systemd service
+      template:
+        src: kube-apiserver.service.jj
+        dest: /etc/systemd/system/kube-apiserver.service
+      vars:
+        internal_ip: "{{ ansible_default_ipv4.address }}"
+    - name: Create kube-controller-manager systemd service
+      template:
+        src: kube-controller-manager.service.jj
+        dest: /etc/systemd/system/kube-controller-manager.service
+    - name: Create kube-scheudler.yaml config file
+      template:
+        src: kube-scheduler.yaml.jj
+        dest: /etc/kubernetes/config/kube-scheduler.yaml
+    - name: Create kube-scheudler systemd service
+      template:
+        src: kube-scheduler.service.jj
+        dest: /etc/systemd/system/kube-scheduler.service
+    - name: Enable systemd services
+      systemd:
+        daemon_reload: yes
+        enabled: yes
+        state: started
+        name: "{{ item }}"
+      with_items:
+        - kube-apiserver
+        - kube-controller-manager
+        - kube-scheduler
+    - name: install nginx
+      apt:
+        name: nginx
+    - name: Create nginx server
+      template:
+        src: kubernetes.default.svc.cluster.local.jj
+        dest: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+    - name: Symlink into enabled sites
+      file:
+        src: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+        dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
+        state: link
+    - name: Restart and enable nginx
+      systemd:
+        enabled: yes
+        state: restarted
+        name: etcd
