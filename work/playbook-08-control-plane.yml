@@ -61,7 +61,9 @@
         - kube-scheduler
     - name: install nginx
       apt:
+        force_apt_get: yes
         name: nginx
+        state: present
     - name: Create nginx server
       template:
         src: kubernetes.default.svc.cluster.local.jj
@@ -75,4 +77,60 @@
       systemd:
         enabled: yes
         state: restarted
-        name: etcd
+        name: nginx
+    - name: Reload nginx
+      systemd:
+        state: reloaded
+        name: nginx
+    - name: RBAC, Create ClusterRole
+      args:
+        executable: /bin/bash
+      shell: |
+        cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
+        apiVersion: rbac.authorization.k8s.io/v1beta1
+        kind: ClusterRole
+        metadata:
+          annotations:
+            rbac.authorization.kubernetes.io/autoupdate: "true"
+          labels:
+            kubernetes.io/bootstrapping: rbac-defaults
+          name: system:kube-apiserver-to-kubelet
+        rules:
+          - apiGroups:
+              - ""
+            resources:
+              - nodes/proxy
+              - nodes/stats
+              - nodes/log
+              - nodes/spec
+              - nodes/metrics
+            verbs:
+              - "*"
+        EOF
+    - name: RBAC, Bind ClusterRole
+      args:
+        executable: /bin/bash
+      shell: |
+        cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
+        apiVersion: rbac.authorization.k8s.io/v1beta1
+        kind: ClusterRoleBinding
+        metadata:
+          name: system:kube-apiserver
+          namespace: ""
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: system:kube-apiserver-to-kubelet
+        subjects:
+          - apiGroup: rbac.authorization.k8s.io
+            kind: User
+            name: kubernetes
+        EOF
+- hosts: master
+  become: yes
+  tasks:
+    - name: install haproxy
+      apt:
+        name: haproxy
+        state: present
+        force_apt_get: yes
