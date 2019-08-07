@@ -1,0 +1,56 @@
+# vim: ts=2:sw=2
+- hosts: controllers
+  become: yes
+  tasks:
+    - name: Download etcd binary
+      get_url:
+        url: "https://github.com/coreos/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-amd64.tar.gz"
+        dest: /tmp/
+    - name: Extract etcd
+      unarchive:
+        src: /tmp/etcd-{{ etcd_version }}-linux-amd64.tar.gz
+        dest: /tmp
+        remote_src: yes
+    - name: Find all etcd binaries
+      find:
+        paths: /tmp/etcd-{{ etcd_version }}-linux-amd64/
+        file_type: file
+        patterns: "etcd*"
+        recurse: no
+      register: etcd_files
+    - name: Copy etcd binaries into /usr/local/bin
+      copy:
+        src: "{{ item.path }}"
+        dest: /usr/local/bin
+        remote_src: yes
+        mode: 0755
+      loop: "{{ etcd_files.files }}"
+    - name: Create etcd config directories
+      file:
+        state: directory
+        path: "{{ item }}"
+      with_items:
+        - /etc/etcd
+        - /var/lib/etcd
+    - name: Copy the pem files
+      copy:
+        src: "{{ item }}"
+        dest: /etc/etcd/
+        remote_src: yes
+      with_items:
+        - ca.pem
+        - kubernetes-key.pem
+        - kubernetes.pem
+    - name: Create etcd.service systemd unit file
+      template:
+        src: etcd.service.jj
+        dest: /etc/systemd/system/etcd.service
+      vars:
+        etcd_name: "{{ ansible_hostname }}"
+        internal_ip: "{{ ansible_default_ipv4.address }}"
+    - name: Start the service
+      systemd:
+        daemon_reload: yes
+        enabled: yes
+        state: started
+        name: etcd
