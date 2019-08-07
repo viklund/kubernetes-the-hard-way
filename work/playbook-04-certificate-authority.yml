@@ -7,7 +7,7 @@
     - name: Create csr files
       template:
         dest: "{{item.file}}-csr.json"
-        src: base-csr.json
+        src: base-csr.json.jj
       vars:
         CN: "{{ item.CN }}"
         O: "{{ item.O }}"
