@@ -12,7 +12,7 @@
              --kubeconfig={{ instance }}.kubeconfig
 
          kubectl config set-credentials {{ ns }}:{{ instance }} \
-             --client-certificate={{ instance }}.pem
+             --client-certificate={{ instance }}.pem \
              --client-key={{ instance }}-key.pem \
              --embed-certs=true \
              --kubeconfig={{ instance }}.kubeconfig
