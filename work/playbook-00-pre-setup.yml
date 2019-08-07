@@ -1,3 +1,4 @@
+# vim: ts=2:sw=2
 - hosts: master
   become: yes
   tasks:
@@ -41,6 +42,8 @@
         shell: cat /etc/extra-hosts >> /etc/hosts
         when: grep_result.rc != 0
       - name: Add hosts to known_hosts file
+        args:
+          executable: /bin/bash
         shell: ssh-keyscan {worker,controller}-{00,01,02} 2>/dev/null | grep ssh-rsa >> .ssh/known_hosts
 - hosts: workers, controllers
   become: yes
