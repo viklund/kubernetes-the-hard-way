@@ -1,0 +1,19 @@
+- hosts: master
+  tasks:
+    - name: Generate random string
+      shell: |
+        head -c 32 /dev/urandom | base64
+      register: random_string
+    - name: Create certificate file
+      template:
+        dest: encryption-config.yaml
+        src:  encryption-config.yaml.jj
+      vars:
+        encryption_key: "{{ random_string.stdout }}"
+    - name: Copy Certificates to the nodes
+      args:
+        executable: /bin/bash
+      shell: |
+        for instance in controller-{00,01,02}; do
+          scp encryption-config.yaml ${instance}:~/
+        done
