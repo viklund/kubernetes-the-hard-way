@@ -126,11 +126,3 @@
             kind: User
             name: kubernetes
         EOF
-- hosts: master
-  become: yes
-  tasks:
-    - name: install haproxy
-      apt:
-        name: haproxy
-        state: present
-        force_apt_get: yes

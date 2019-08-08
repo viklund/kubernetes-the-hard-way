@@ -1,0 +1,21 @@
+# vim: ts=2:sw=2
+- hosts: master
+  become: yes
+  tasks:
+    - name: install haproxy
+      apt:
+        name: haproxy
+        state: present
+        force_apt_get: yes
+    - name: Install haproxy config file
+      template:
+        src: haproxy.cfg.jj
+        dest: /etc/haproxy/haproxy.cfg
+        mode: 0644
+        owner: root
+        group: root
+    - name: Reload haproxy
+      systemd:
+        enabled: yes
+        state: restarted
+        name: haproxy
