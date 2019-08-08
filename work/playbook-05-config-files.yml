@@ -28,10 +28,10 @@
         ns: "{{ item.ns }}"
         public_ip: "{{ item.public_ip }}"
       loop:
-        - { instance: 'worker-00',               ns: 'system:node', public_ip: '10.0.0.6' }
-        - { instance: 'worker-01',               ns: 'system:node', public_ip: '10.0.0.6' }
-        - { instance: 'worker-02',               ns: 'system:node', public_ip: '10.0.0.6' }
-        - { instance: 'kube-proxy',              ns: 'system',      public_ip: '10.0.0.6' }
+        - { instance: 'worker-00',               ns: 'system:node', public_ip: '{{ public_ip }}' }
+        - { instance: 'worker-01',               ns: 'system:node', public_ip: '{{ public_ip }}' }
+        - { instance: 'worker-02',               ns: 'system:node', public_ip: '{{ public_ip }}' }
+        - { instance: 'kube-proxy',              ns: 'system',      public_ip: '{{ public_ip }}' }
         - { instance: 'kube-controller-manager', ns: 'system',      public_ip: '127.0.0.1' }
         - { instance: 'kube-scheduler',          ns: 'system',      public_ip: '127.0.0.1' }
         - { instance: 'admin',                   ns: 'system',      public_ip: '127.0.0.1' }
