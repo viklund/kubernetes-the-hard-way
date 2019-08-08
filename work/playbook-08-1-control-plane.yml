@@ -1,6 +1,8 @@
 # vim: ts=2:sw=2
 - hosts: controllers
   become: yes
+  vars:
+    init: 0
   tasks:
     - name: Create kubernetes directories
       file:
@@ -9,6 +11,7 @@
       with_items:
         - /etc/kubernetes/config
         - /var/lib/kubernetes
+      when: init == 1
     - name: Download Kubernetes Controller Binaries
       get_url:
         url: "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetes_version }}/bin/linux/amd64/{{ item }}"
@@ -19,6 +22,7 @@
         - kube-controller-manager
         - kube-scheduler
         - kubectl
+      when: init == 1
     - name: Move files into kubernetes directory
       args:
         executable: /bin/bash
@@ -31,6 +35,7 @@
              kube-scheduler.kubeconfig \
              /var/lib/kubernetes/
       ignore_errors: yes
+      when: init == 1
     - name: Create kube-apiserver systemd service
       template:
         src: kube-apiserver.service.jj

@@ -11,6 +11,7 @@ my %ips = ();
 while (<$HOSTS>) {
     my ($ip, $name) = split;
     $name =~ s/-/_/g;
+
     $ips{ "${name}_ip" } = $ip;
 }
 
