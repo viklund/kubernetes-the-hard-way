@@ -1,0 +1,21 @@
+# vim: ts=2:sw=2
+- hosts: master
+  tasks:
+    - name: Create kubeconfig files
+      args:
+          executable: /bin/bash
+      shell: |
+         kubectl config set-cluster kubernetes-the-hard-way \
+             --certificate-authority=ca.pem \
+             --embed-certs=true \
+             --server=https://{{ public_ip }}:6443
+
+         kubectl config set-credentials system:admin \
+             --client-certificate=admin.pem \
+             --client-key=admin-key.pem
+
+         kubectl config set-context kubernetes-the-hard-way \
+             --cluster=kubernetes-the-hard-way \
+             --user=system:admin
+
+         kubectl config use-context kubernetes-the-hard-way

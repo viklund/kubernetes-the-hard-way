@@ -1,0 +1,73 @@
+- hosts: master
+  tasks:
+    - name: Copy CA Config file
+      copy:
+        dest: ca-config.json
+        src: ca-config.json
+    - name: Create csr files
+      template:
+        dest: "{{item.file}}-csr.json"
+        src: base-csr.json.jj
+      vars:
+        CN: "{{ item.CN }}"
+        O: "{{ item.O }}"
+        OU: "{{ item.OU }}"
+      loop:
+        - { file: 'ca',                      CN: "Kubernetes",                     O: "Kubernetes",                     OU: "Wizzard Training" }
+        - { file: 'admin',                   CN: "admin",                          O: "system:masters",                 OU: "Kubernetes The Hard Way" }
+        - { file: 'worker-00',               CN: "system:node:worker-00",          O: "system:nodes",                   OU: "Kubernetes The Hard Way" }
+        - { file: 'worker-01',               CN: "system:node:worker-01",          O: "system:nodes",                   OU: "Kubernetes The Hard Way" }
+        - { file: 'worker-02',               CN: "system:node:worker-02",          O: "system:nodes",                   OU: "Kubernetes The Hard Way" }
+        - { file: 'kube-controller-manager', CN: "system:kube-controller-manager", O: "system:kube-controller-manager", OU: "Kubernetes The Hard Way" }
+        - { file: 'kube-proxy',              CN: 'system:kube-proxy',              O: 'system:node-proxier',            OU: "Kubernetes The Hard Way" }
+        - { file: 'kube-scheduler',          CN: 'system:kube-scheduler',          O: 'system:kube-scheduler',          OU: "Kubernetes The Hard Way" }
+        - { file: 'kubernetes',              CN: 'kubernetes',                     O: 'Kubernetes',                     OU: "Kubernetes The Hard Way" }
+        - { file: 'service-account',         CN: 'service-accounts',               O: 'Kubernetes',                     OU: "Kubernetes The Hard Way" }
+    - name: Create CA
+      shell: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+    - name: Create Client Certificates
+      args:
+        executable: /bin/bash
+      shell: |
+        for instance in worker-{00,01,02}; do
+          echo "INSTANCE IS: $instance"
+          INTERNAL_IP=$( grep $instance /etc/hosts | awk '{print $1}' )
+          cfssl gencert \
+              -ca=ca.pem \
+              -ca-key=ca-key.pem \
+              -config=ca-config.json \
+              -hostname=${instance},${INTERNAL_IP} \
+              -profile=kubernetes \
+              ${instance}-csr.json | cfssljson -bare ${instance}
+        done
+    - name: Create Certificates
+      shell: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes {{ item }}-csr.json | cfssljson -bare {{ item }}
+      with_items:
+        - admin
+        - kube-controller-manager
+        - kube-proxy
+        - kube-scheduler
+        - service-account
+    - name: Create Kubernetes API Server Certificate
+      shell: |
+        EXTERNAL_IP=130.239.81.217 ### TODO FIX THIS
+        INTERNAL_IP=$( ip addr | grep 10.0.0 | awk '{print $2}' | cut -d/ -f1 )
+        IPS=$( grep controller /etc/hosts | awk '{print $1}' | tr "\n" ',' | sed 's/,$//' )
+        
+        cfssl gencert \
+          -ca=ca.pem \
+          -ca-key=ca-key.pem \
+          -config=ca-config.json \
+          -hostname=10.32.0.1,${IPS},${EXTERNAL_IP},${INTERNAL_IP},127.0.0.1,kubernetes.default \
+          -profile=kubernetes \
+          kubernetes-csr.json | cfssljson -bare kubernetes
+    - name: Copy Certificates to the nodes
+      args:
+        executable: /bin/bash
+      shell: |
+        for instance in worker-{00,01,02}; do
+          scp ca.pem ${instance}{,-key}.pem ${instance}:~/
+        done
+        for instance in controller-{00,01,02}; do
+          scp ca.pem ca-key.pem kubernetes{,-key}.pem service-account{,-key}.pem ${instance}:~/
+        done

@@ -1,0 +1,10 @@
+etcd_version: "v3.3.13"
+kubernetes_version: "v1.12.0"
+master_ip: 10.0.0.10
+controller_00_ip: 10.0.0.9
+controller_01_ip: 10.0.0.5
+controller_02_ip: 10.0.0.15
+worker_00_ip: 10.0.0.8
+worker_01_ip: 10.0.0.13
+worker_02_ip: 10.0.0.6
+public_ip: "{{ master_ip }}"

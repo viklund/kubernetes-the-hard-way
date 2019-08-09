@@ -1,0 +1,81 @@
+# vim: ts=2:sw=2
+- hosts: master
+  become: yes
+  tasks:
+      - name: Check if we have internal ens
+        command: ip link show ens4
+        register: ip_link_result
+        ignore_errors: True
+      - name: Start the internal interface
+        command: ip link set ens4 up
+        when: ip_link_result.stdout.find('state UP') == -1
+      - name: Check if we have internal ip on ens
+        command: ip addr show dev ens4
+        register: ip_addr_result
+        ignore_errors: True
+      - name: Add ip to other interface
+        command: ip addr add {{ internal_ip }}/24 dev ens4
+        when: ip_addr_result.stdout.find('inet 10.0.0') == -1
+      - name: Add route for 10.0.0.0/8 net
+        command: ip route add 10.0.0.0/8 dev ens4
+        when: 1 == 1
+      - name: Enable MASQUERADING of internal network
+        iptables:
+            table: nat
+            chain: POSTROUTING
+            jump: MASQUERADE
+            out_interface: ens3
+      - name: Enable ip_forward
+        sysctl:
+            name: net.ipv4.ip_forward
+            value: "1"
+            sysctl_set: yes
+            state: present
+            reload: yes
+      - name: Check for hosts in /etc/hosts
+        shell: grep worker /etc/hosts
+        register: grep_result
+        failed_when: grep_result.rc == 54
+      - name: Copy local file to node
+        copy:
+            src: hosts
+            dest: /etc/extra-hosts
+        when: grep_result.rc != 0
+      - name: Add extra hosts to end of hosts file
+        shell: cat /etc/extra-hosts >> /etc/hosts
+        when: grep_result.rc != 0
+      - name: Add hosts to known_hosts file
+        args:
+          executable: /bin/bash
+        shell: ssh-keyscan {worker,controller}-{00,01,02} 2>/dev/null | grep ssh-rsa >> .ssh/known_hosts
+- hosts: workers, controllers
+  become: yes
+  tasks:
+      - name: Check if default route is correct
+        shell: ip route | grep 'default via {{ router }}'
+        register: ip_route_result
+        ignore_errors: True
+        failed_when: ip_route_result.rc == 2
+      - name: Delete incorrect default route
+        command: ip route del default
+        when: ip_route_result.rc != 0
+      - name: Add correct default route
+        command: ip route add default via {{ router }}
+        when: ip_route_result.rc != 0
+      - name: Fix resolv.conf
+        lineinfile:
+            path: /etc/resolv.conf
+            regexp: '^nameserver'
+            line: 'nameserver 8.8.8.8'
+      - name: Check for hosts in /etc/hosts
+        shell: grep worker /etc/hosts
+        register: grep_result
+        failed_when: grep_result.rc == 54
+      - name: Copy local file to node
+        copy:
+            src: hosts
+            dest: /etc/extra-hosts
+        when: grep_result.rc != 0
+      - name: Add extra hosts to end of hosts file
+        shell: cat /etc/extra-hosts >> /etc/hosts
+        when: grep_result.rc != 0
