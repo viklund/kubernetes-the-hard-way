@@ -3,7 +3,7 @@
   become: yes
   vars:
     init: 1
-    pod_cidr: "{{ '10.0.%d.0/16' | format(10 + ( ansible_hostname | replace('worker-','' ) | int) ) }}"
+    pod_cidr: "{{ '10.0.%d.0/24' | format(10 + ( ansible_hostname | replace('worker-','' ) | int) ) }}"
   tasks:
     - name: Create kubernetes directories
       file:
