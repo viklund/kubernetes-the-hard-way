@@ -18,8 +18,6 @@ sleep 60
 # Set up some ip tables routes
 ansible-playbook -i inventory playbook-00-*.yml; sleep 3
 
-#./fix-ssh-keys.pl
-
 ## Run all the playbooks. One playbook per step in the guide
 ansible-playbook -i inventory playbook-02-*.yml; sleep 3
 ansible-playbook -i inventory playbook-04-*.yml; sleep 3
