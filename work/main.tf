@@ -32,7 +32,7 @@ variable "floating-ip" {
 module "k8shard-net" {
   source = "./tf/network"
   name = "k8shard-net"
-  cidr = "10.0.0.0/16"
+  cidr = "10.0.0.0/24"
   external_network_id = "52b76a82-5f02-4a3e-9836-57536ef1cb63"
 }
 
@@ -70,12 +70,32 @@ resource "openstack_compute_instance_v2" "k8shard-master" {
   }
 }
 
+
+
+resource "openstack_networking_subnet_v2" "controller-subnet" {
+  name = format("k8shard-controller-subnet")
+  network_id = module.k8shard-net.network-id
+  cidr = "10.10.0.0/16"
+  ip_version = 4
+  dns_nameservers = ["8.8.8.8"]
+}
+
 module "controllers" {
   source = "./tf/compute"
   base_name = "controller"
   compute_count = 3
   network = module.k8shard-net.network-id
+  subnet = openstack_networking_subnet_v2.controller-subnet.id
   image_id = var.image-id
+}
+
+
+resource "openstack_networking_subnet_v2" "worker-subnet" {
+  name = "k8shard-worker-subnet"
+  network_id = module.k8shard-net.network-id
+  cidr = "10.20.0.0/16"
+  ip_version = 4
+  dns_nameservers = ["8.8.8.8"]
 }
 
 module "workers" {
@@ -83,9 +103,9 @@ module "workers" {
   base_name = "worker"
   compute_count = 3
   network = module.k8shard-net.network-id
+  subnet = openstack_networking_subnet_v2.worker-subnet.id
   image_id = var.image-id
 }
-  #network = var.external-network
 
 resource "openstack_compute_floatingip_associate_v2" "fip_1" {
   floating_ip = var.floating-ip
