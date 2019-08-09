@@ -16,6 +16,9 @@
       - name: Add ip to other interface
         command: ip addr add {{ internal_ip }}/24 dev ens4
         when: ip_addr_result.stdout.find('inet 10.0.0') == -1
+      - name: Add route for 10.0.0.0/8 net
+        command: ip route add 10.0.0.0/8 dev ens4
+        when: 1 == 1
       - name: Enable MASQUERADING of internal network
         iptables:
             table: nat

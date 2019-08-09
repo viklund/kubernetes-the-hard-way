@@ -2,7 +2,7 @@
 - hosts: controllers
   become: yes
   vars:
-    init: 0
+    init: 1
   tasks:
     - name: Create kubernetes directories
       file:
