@@ -6,6 +6,6 @@
       args:
         executable: /bin/bash
       shell: |
-        ip route add 10.0.10.0/24 via {{ worker_00_ip }}
-        ip route add 10.0.11.0/24 via {{ worker_01_ip }}
-        ip route add 10.0.12.0/24 via {{ worker_02_ip }}
+        ip addr | grep {{ worker_00_ip }} || ip route add 10.0.10.0/24 via {{ worker_00_ip }}
+        ip addr | grep {{ worker_01_ip }} || ip route add 10.0.11.0/24 via {{ worker_01_ip }}
+        ip addr | grep {{ worker_02_ip }} || ip route add 10.0.12.0/24 via {{ worker_02_ip }}
