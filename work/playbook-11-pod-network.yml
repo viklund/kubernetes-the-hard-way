@@ -1,0 +1,11 @@
+# vim: ts=2:sw=2
+- hosts: workers, master, controllers
+  become: yes
+  tasks:
+    - name: Add network routes
+      args:
+        executable: /bin/bash
+      shell: |
+        ip route add 10.0.10.0/24 via {{ worker_00_ip }}
+        ip route add 10.0.11.0/24 via {{ worker_01_ip }}
+        ip route add 10.0.12.0/24 via {{ worker_02_ip }}
