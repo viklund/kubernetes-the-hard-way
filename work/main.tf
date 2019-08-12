@@ -9,7 +9,8 @@ variable "image-id" {
   type = string
   #default = "ba115875-5332-4f04-84bc-429d6730b3ab" ## Debian
   #default = "f8e54e0d-6337-449f-a8f3-c0a40339d827" ## Ubuntu
-  default = "3301175c-f322-4013-96c5-e2c3523083d5"
+  #default = "3301175c-f322-4013-96c5-e2c3523083d5"
+  default = "995da339-7698-49f0-91de-b20e49cb8fe2"
 }
 
 variable "external-network" {
